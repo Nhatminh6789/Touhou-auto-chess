@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Touhou Auto Chess</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            background-color: #08080c;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: #08080c;
+        }
+
+        /* HEADER TOP BAR */
+        #header {
+            padding: 0 8px;
+            background: #111118;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            border-bottom: 1px solid #222232;
+            height: 36px;
+            z-index: 20;
+            flex-shrink: 0;
+        }
+        .stat-box { display: flex; align-items: center; gap: 3px; font-weight: bold; }
+        #timer-box {
+            font-weight: bold;
+            color: #f1c40f;
+            background: #1c1c2b;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #f1c40f;
+            font-size: 11px;
+        }
+
+        #audio-btn {
+            background: #252538;
+            border: 1px solid #444466;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+            cursor: pointer;
+        }
+
+        /* MAIN CONTENT AREA */
+        #main-area {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* LEFT SIDEBAR: SYNERGIES (TỘC HỆ TFT) */
+        #synergy-panel {
+            width: 80px;
+            background: rgba(12, 12, 18, 0.92);
+            border-right: 1px solid #1f1f2e;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 10;
+            overflow-y: auto;
+        }
+        .synergy-item {
+            background: #151520;
+            border: 1px solid #252535;
+            border-radius: 4px;
+            padding: 4px 3px;
+            font-size: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: all 0.2s;
+        }
+        .synergy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .synergy-count {
+            background: #202030;
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: #888;
+            font-size: 8px;
+        }
+        .synergy-item.active-1 {
+            background: rgba(46, 204, 113, 0.15);
+            border-color: #2ecc71;
+            color: #2ecc71;
+        }
+        .synergy-item.active-1 .synergy-count {
+            background: #2ecc71;
+            color: #000;
+            font-weight: bold;
+        }
+        .synergy-item.active-2 {
+            background: rgba(241, 196, 15, 0.2);
+            border-color: #f1c40f;
+            color: #f1c40f;
+            box-shadow: 0 0 5px rgba(241, 196, 15, 0.3);
+        }
+        .synergy-item.active-2 .synergy-count {
+            background: #f1c40f;
+            color: #000;
+            font-weight: bold;
+        }
+        .synergy-thresholds {
+            font-size: 7px;
+            color: #666;
+        }
+
+        /* RIGHT SIDEBAR: PLAYERS LIST */
+        #players-panel {
+            width: 82px;
+            background: rgba(12, 12, 18, 0.92);
+            border-left: 1px solid #1f1f2e;
+            padding: 4px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            z-index: 10;
+        }
+        .player-item {
+            background: #151520;
+            border: 1px solid #252535;
+            border-radius: 4px;
+            padding: 3px 3px;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            position: relative;
+        }
+        .player-item.viewing {
+            border-color: #f1c40f;
+            box-shadow: 0 0 6px rgba(241, 196, 15, 0.4);
+        }
+        .player-item.target-opponent {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.15);
+        }
+        .player-item.dead { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+        .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 44px; }
+        .player-hp { font-weight: bold; color: #2ecc71; font-size: 8px; }
+        .sword-icon { font-size: 9px; margin-right: 1px; }
+
+        /* CENTER CANVAS CONTAINER */
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle, #161626 0%, #050508 100%);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+
+        #match-banner {
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 32, 0.9);
+            border: 1px solid #f1c40f;
+            color: #f1c40f;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 10px;
+            z-index: 30;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #btn-return-home {
+            position: absolute;
+            top: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 9px;
+            cursor: pointer;
+            display: none;
+            z-index: 30;
+        }
+
+        /* BẢNG CHỈ SỐ TƯỚNG & NÚT BÁN (POPUP INSPECT) */
+        #unit-inspect-modal {
+            position: absolute;
+            bottom: 76px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 320px;
+            background: rgba(18, 18, 28, 0.95);
+            border: 1px solid #383852;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 40;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            touch-action: auto;
+        }
+        .inspect-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2a2a3e;
+            padding-bottom: 4px;
+        }
+        .inspect-title { font-weight: bold; font-size: 11px; }
+        .inspect-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            font-size: 9px;
+            color: #ccc;
+        }
+        .inspect-btn-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .btn-sell-unit {
+            flex: 1;
+            background: #c0392b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px;
+            font-weight: bold;
+            font-size: 9px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .btn-sell-unit:active { opacity: 0.8; }
+        .btn-close-inspect {
+            background: #33334d;
+            color: #aaa;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 9px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        /* BOTTOM CONTROLS & SHOP */
+        #controls {
+            padding: 4px;
+            background: #111118;
+            border-top: 1px solid #222232;
+            display: flex;
+            gap: 4px;
+            z-index: 20;
+            flex-shrink: 0;
+            height: 72px;
+            position: relative;
+        }
+        #controls.sell-hover {
+            background: rgba(231, 76, 60, 0.25) !important;
+            border-top: 2px solid #e74c3c !important;
+        }
+
+        #sell-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(192, 57, 43, 0.85);
+            color: #fff;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 50;
+            pointer-events: none;
+            backdrop-filter: blur(2px);
+        }
+
+        #shop {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+        }
+        .shop-item {
+            background: #181826;
+            border: 1px solid #2a2a3e;
+            border-radius: 5px;
+            padding: 2px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 8px;
+            text-align: center;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .shop-item:active { transform: scale(0.95); }
+        .shop-item .name { font-weight: bold; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .shop-item .cost { color: #f1c40f; font-weight: bold; }
+        .shop-item .traits { font-size: 7px; color: #888; }
+
+        .btn-action {
+            width: 52px;
+            background: #252538;
+            color: #fff;
+            border: 1px solid #383850;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            touch-action: manipulation;
+        }
+        .btn-action:active { transform: scale(0.95); }
+        .btn-action.locked {
+            border-color: #f1c40f;
+            background: #342b10;
+            color: #f1c40f;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="header">
+        <div class="stat-box">❤ <span id="hp-val">100</span></div>
+        <div class="stat-box">🪙 <span id="gold-val">0</span></div>
+        <div id="timer-box">⏳ <span id="timer-val">20</span>s</div>
+        <div class="stat-box" style="color:#3498db;">Lv.<span id="level-val">1</span> (<span id="xp-val">0/2</span>)</div>
+        <div class="stat-box" style="color: #f1c40f;">🏆 <span id="stage-val">Stage 1-1</span></div>
+        <button id="audio-btn" onclick="toggleAudio()">🔊 Âm thanh</button>
+    </div>
+
+    <div id="main-area">
+        <!-- BẢNG TỘC HỆ CHUẨN TFT -->
+        <div id="synergy-panel">
+            <div style="font-size:7.5px; font-weight:bold; color:#666; margin-bottom:2px; text-align:center;">TỘC / HỆ</div>
+            <div id="synergy-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+        </div>
+
+        <div id="canvas-container">
+            <div id="match-banner">⏳ Đang chuẩn bị...</div>
+            <button id="btn-return-home" onclick="viewPlayerBoard(0)">🏠 Về sân nhà</button>
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- BẢNG THÔNG TIN CHỈ SỐ TƯỚNG & NÚT BÁN -->
+            <div id="unit-inspect-modal">
+                <div class="inspect-header">
+                    <span class="inspect-title" id="inspect-name">Tên Tướng</span>
+                    <span style="font-size:9px; color:#f1c40f;" id="inspect-trait">Tộc/Hệ</span>
+                </div>
+                <div class="inspect-stats">
+                    <div>❤️ Máu: <span id="inspect-hp">0</span></div>
+                    <div>⚔️ Sức đánh: <span id="inspect-atk">0</span></div>
+                    <div>🎯 Tầm đánh: <span id="inspect-range">0</span></div>
+                    <div>⭐ Cấp sao: <span id="inspect-star">1</span>⭐</div>
+                </div>
+                <div class="inspect-btn-row">
+                    <button class="btn-sell-unit" id="btn-inspect-sell" onclick="sellInspectedUnit()">💰 Bán tướng (+<span id="inspect-sell-gold">1</span>🪙)</button>
+                    <button class="btn-close-inspect" onclick="closeInspectModal()">Đóng</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="players-panel">
+            <div style="font-size:7.5px; font-weight:bold; color:#666; margin-bottom:2px; text-align:center;">ĐỐI THỦ</div>
+            <div id="players-list-content" style="display:flex; flex-direction:column; gap:3px;"></div>
+        </div>
+    </div>
+
+    <!-- KHU VỰC CỬA HÀNG KÈM OVERLAY KÉO THẢ BÁN -->
+    <div id="controls">
+        <div id="sell-overlay">💰 THẢ ĐỂ BÁN TƯỚNG (+<span id="sell-price-val">1</span>🪙)</div>
+
+        <button class="btn-action" id="btn-buy-xp">
+            <span>Mua XP</span>
+            <span style="color:#3498db;">(4🪙)</span>
+        </button>
+        <button class="btn-action" id="btn-lock">
+            <span id="lock-icon">🔓</span>
+            <span id="lock-text">Mở khóa</span>
+        </button>
+        <div id="shop"></div>
+        <button class="btn-action" id="btn-refresh">
+            <span>Đổi shop</span>
+            <span style="color:#f1c40f;">(2🪙)</span>
+        </button>
+    </div>
+</div>
+
+<script>
+// --- AUDIO SYSTEM ---
+let audioCtx = null;
+let isAudioMuted = false;
+let bgmTimer = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        startBGM();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playTone(freq, type = 'sine', duration = 0.1, vol = 0.1) {
+    if (isAudioMuted || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+}
+
+function playSound(type) {
+    initAudio();
+    if (type === 'attack') playTone(300 + Math.random() * 100, 'square', 0.05, 0.05);
+    else if (type === 'skill') {
+        playTone(600, 'sawtooth', 0.2, 0.1);
+        setTimeout(() => playTone(800, 'sawtooth', 0.2, 0.1), 50);
+    } else if (type === 'buy') {
+        playTone(523.25, 'triangle', 0.08, 0.1);
+        setTimeout(() => playTone(659.25, 'triangle', 0.12, 0.1), 80);
+    } else if (type === 'sell') {
+        playTone(400, 'sine', 0.1, 0.1);
+        setTimeout(() => playTone(300, 'sine', 0.15, 0.1), 60);
+    }
+}
+
+function startBGM() {
+    if (bgmTimer) return;
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    let step = 0;
+    bgmTimer = setInterval(() => {
+        if (!isAudioMuted && audioCtx) {
+            playTone(notes[step % notes.length], 'sine', 0.2, 0.03);
+            step++;
+        }
+    }, 400);
+}
+
+function toggleAudio() {
+    initAudio();
+    isAudioMuted = !isAudioMuted;
+    document.getElementById("audio-btn").innerText = isAudioMuted ? "🔇 Tắt âm" : "🔊 Âm thanh";
+}
+
+document.addEventListener("pointerdown", initAudio, { once: true });
+
+// --- CONFIG TỘC HỆ & DỮ LIỆU ---
+const SYNERGIES_DATA = {
+    Hakurei:  { name: "Hakurei",  thresholds: [2, 4] },
+    Scarlet:  { name: "Scarlet",  thresholds: [2, 4] },
+    Youkai:   { name: "Youkai",   thresholds: [2, 4] },
+    Magician: { name: "Magician", thresholds: [2, 4] }
+};
+
+const HERO_TYPES = {
+    Reimu:   { name: "Reimu",   cost: 1, hp: 130, atk: 22, range: 2, trait: "Hakurei", color: "#eb3b5a" },
+    Marisa:  { name: "Marisa",  cost: 1, hp: 85,  atk: 32, range: 3, trait: "Magician", color: "#f7b731" },
+    Cirno:   { name: "Cirno",   cost: 1, hp: 105, atk: 18, range: 2, trait: "Youkai", color: "#2bcbba" },
+    Sakuya:  { name: "Sakuya",  cost: 2, hp: 115, atk: 28, range: 2, trait: "Scarlet", color: "#778ca3" },
+    Remilia: { name: "Remilia", cost: 3, hp: 170, atk: 38, range: 1, trait: "Scarlet", color: "#b33939" },
+    Youmu:   { name: "Youmu",   cost: 2, hp: 135, atk: 34, range: 1, trait: "Youkai", color: "#26de81" },
+    Alice:   { name: "Alice",   cost: 2, hp: 95,  atk: 26, range: 3, trait: "Magician", color: "#fa8231" },
+    Sanae:   { name: "Sanae",   cost: 3, hp: 150, atk: 22, range: 2, trait: "Hakurei", color: "#20bf6b" }
+};
+
+const MONSTER_TYPES = {
+    SmallMonster: { name: "Tiểu Yêu", hp: 120, atk: 15, range: 1, color: "#8e44ad", size: 1, isBoss: false },
+    BossMonster:  { name: "Đại Quái",  hp: 1200, atk: 65, range: 4, color: "#c0392b", size: 2.8, isBoss: true }
+};
+
+const LEVEL_XP = [0, 2, 4, 10, 20, 36, 56, 80];
+const BOARD_LAYOUT = [5, 6, 5, 6, 5, 6, 5, 6]; 
+const TOTAL_ROWS = BOARD_LAYOUT.length;
+
+let players = [
+    { id: 0, name: "Bạn", hp: 100, isBot: false, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 1, name: "Bot Reimu", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 2, name: "Bot Marisa", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 3, name: "Bot Sakuya", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 4, name: "Bot Remilia", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 5, name: "Bot Youmu", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 6, name: "Bot Alice", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 },
+    { id: 7, name: "Bot Cirno", hp: 100, isBot: true, board: BOARD_LAYOUT.map(count => Array(count).fill(null)), bench: Array(6).fill(null), gold: 0, level: 1, xp: 0 }
+];
+
+let currentViewingPlayerId = 0;
+let currentOpponentId = null;
+
+let state = {
+    stageMajor: 1,
+    stageMinor: 1,
+    gold: 0,
+    level: 1,
+    xp: 0,
+    winStreak: 0,
+    lossStreak: 0,
+    phase: "PREPARE",
+    timer: 20,
+    shop: [],
+    isShopLocked: false,
+    draggedUnit: null,
+    dragStartLocation: null,
+    dragPos: { x: 0, y: 0 },
+    projectiles: [],
+    inspectedUnitRef: null // Lưu vết tướng đang xem bảng chỉ số
+};
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let hexRadius = 0;
+
+function resizeCanvas() {
+    const container = document.getElementById("canvas-container");
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    
+    const widthHex = canvas.width / (5.6 * Math.sqrt(3));
+    const heightHex = canvas.height / 14.5;
+    hexRadius = Math.min(widthHex, heightHex);
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+class Unit {
+    constructor(typeKey, isEnemy = false, star = 1, isMonster = false) {
+        this.isMonster = isMonster;
+        if (isMonster) {
+            const m = MONSTER_TYPES[typeKey];
+            this.typeKey = typeKey;
+            this.name = m.name;
+            this.cost = 0;
+            this.star = 1;
+            this.maxHp = m.hp;
+            this.hp = this.maxHp;
+            this.mana = 0;
+            this.maxMana = 100;
+            this.atk = m.atk;
+            this.range = m.range;
+            this.trait = "Quái";
+            this.color = m.color;
+            this.isEnemy = true;
+            this.size = m.size || 1;
+            this.isBoss = m.isBoss || false;
+        } else {
+            const base = HERO_TYPES[typeKey];
+            this.typeKey = typeKey;
+            this.name = base.name;
+            this.cost = base.cost;
+            this.star = star;
+            this.maxHp = Math.floor(base.hp * Math.pow(1.8, star - 1));
+            this.hp = this.maxHp;
+            this.mana = 0;
+            this.maxMana = 100;
+            this.atk = Math.floor(base.atk * Math.pow(1.5, star - 1));
+            this.range = base.range;
+            this.trait = base.trait;
+            this.color = base.color;
+            this.isEnemy = isEnemy;
+            this.size = 1;
+            this.isBoss = false;
+        }
+        this.x = 0;
+        this.y = 0;
+        this.attackTimer = 0;
+    }
+}
+
+function initGame() {
+    const cost1Keys = Object.keys(HERO_TYPES).filter(k => HERO_TYPES[k].cost === 1);
+    
+    players.forEach(p => {
+        const randomKey = cost1Keys[Math.floor(Math.random() * cost1Keys.length)];
+        p.board[7][2] = new Unit(randomKey);
+        p.level = 1;
+        p.xp = 0;
+        p.gold = 0;
+    });
+
+    addXP(2);
+    pickNextOpponent();
+    spawnPveMonstersIfPrepare();
+    setupControlsEvents();
+    updateUI();
+}
+
+setInterval(() => {
+    if (state.phase === "PREPARE") {
+        state.timer--;
+        document.getElementById("timer-val").innerText = state.timer;
+        if (state.timer <= 0) startCombat();
+    }
+}, 1000);
+
+function drawHexagon(cx, cy, r, fillColor, strokeColor) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function getCellCenter(r, c) {
+    const hexW = Math.sqrt(3) * hexRadius;
+    const hexH = 1.5 * hexRadius;
+    const totalBoardHeight = (TOTAL_ROWS - 1) * hexH;
+    const startY = (canvas.height * 0.62 - totalBoardHeight) / 2 + hexRadius;
+    const y = startY + r * hexH;
+
+    const rowOffset = (BOARD_LAYOUT[r] === 5) ? hexW / 2 : 0;
+    const startX = (canvas.width - (6 * hexW)) / 2 + hexW / 2;
+    const x = startX + rowOffset + c * hexW;
+
+    return { x, y };
+}
+
+function toggleLockShop() {
+    state.isShopLocked = !state.isShopLocked;
+    const btn = document.getElementById("btn-lock");
+    if (state.isShopLocked) {
+        btn.classList.add("locked");
+        document.getElementById("lock-icon").innerText = "🔒";
+        document.getElementById("lock-text").innerText = "Đã khóa";
+    } else {
+        btn.classList.remove("locked");
+        document.getElementById("lock-icon").innerText = "🔓";
+        document.getElementById("lock-text").innerText = "Mở khóa";
+    }
+}
+
+function refreshShop(force = false) {
+    if (!force && state.isShopLocked) return;
+    if (state.stageMajor === 1 && state.stageMinor === 1) {
+        state.shop = [];
+        renderShop();
+        return;
+    }
+    const keys = Object.keys(HERO_TYPES);
+    state.shop = [];
+    for (let i = 0; i < 5; i++) {
+        state.shop.push(keys[Math.floor(Math.random() * keys.length)]);
+    }
+    renderShop();
+}
+
+function renderShop() {
+    const shopEl = document.getElementById("shop");
+    shopEl.innerHTML = "";
+    
+    if (state.stageMajor === 1 && state.stageMinor === 1) {
+        shopEl.innerHTML = `<div style="grid-column: span 5; display:flex; align-items:center; justify-content:center; color:#888; font-size:9px;">Cửa hàng mở ở vòng 1-2</div>`;
+        return;
+    }
+
+    state.shop.forEach((key, index) => {
+        if (!key) {
+            shopEl.innerHTML += `<div class="shop-item" style="opacity:0.2; pointer-events:none;">Đã mua</div>`;
+            return;
+        }
+        const h = HERO_TYPES[key];
+        const item = document.createElement("div");
+        item.className = "shop-item";
+        item.innerHTML = `
+            <div class="name" style="color:${h.color}">${h.name}</div>
+            <div class="cost">${h.cost} 🪙</div>
+            <div class="traits">${h.trait}</div>
+        `;
+        
+        item.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            buyHero(index);
+        });
+
+        shopEl.appendChild(item);
+    });
+}
+
+function setupControlsEvents() {
+    document.getElementById("btn-buy-xp").addEventListener("pointerdown", (e) => { e.preventDefault(); buyXP(); });
+    document.getElementById("btn-lock").addEventListener("pointerdown", (e) => { e.preventDefault(); toggleLockShop(); });
+    document.getElementById("btn-refresh").addEventListener("pointerdown", (e) => { e.preventDefault(); userRefreshShop(); });
+}
+
+function userRefreshShop() {
+    if (state.phase === "PREPARE" && state.gold >= 2 && currentViewingPlayerId === 0) {
+        if (state.stageMajor === 1 && state.stageMinor === 1) return;
+        state.gold -= 2;
+        playSound('buy');
+        refreshShop(true);
+        updateUI();
+    }
+}
+
+function buyHero(index) {
+    if (state.phase !== "PREPARE" || currentViewingPlayerId !== 0) return;
+    const key = state.shop[index];
+    if (!key) return;
+    const cost = HERO_TYPES[key].cost;
+
+    let myPlayer = players[0];
+    if (state.gold >= cost) {
+        const emptyBenchSlot = myPlayer.bench.findIndex(slot => slot === null);
+        if (emptyBenchSlot !== -1) {
+            state.gold -= cost;
+            myPlayer.bench[emptyBenchSlot] = new Unit(key);
+            state.shop[index] = null;
+            playSound('buy');
+            checkTripleMerge(myPlayer, key, 1);
+            updateUI();
+            renderShop();
+        }
+    }
+}
+
+function buyXP() {
+    if (state.phase !== "PREPARE" || currentViewingPlayerId !== 0 || state.gold < 4) return;
+    if (state.level >= 8) return;
+
+    state.gold -= 4;
+    playSound('buy');
+    addXP(4);
+    updateUI();
+}
+
+function addXP(amount) {
+    state.xp += amount;
+    while (state.level < 8 && state.xp >= LEVEL_XP[state.level]) {
+        state.xp -= LEVEL_XP[state.level];
+        state.level++;
+    }
+}
+
+function checkTripleMerge(player, typeKey, starLevel) {
+    let units = [];
+    player.bench.forEach((u, idx) => {
+        if (u && u.typeKey === typeKey && u.star === starLevel) units.push({ location: 'bench', index: idx });
+    });
+    for (let r = 4; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            let u = player.board[r][c];
+            if (u && u.typeKey === typeKey && u.star === starLevel) units.push({ location: 'board', r, c });
+        }
+    }
+
+    if (units.length >= 3) {
+        for (let i = 0; i < 3; i++) {
+            let target = units[i];
+            if (target.location === 'bench') player.bench[target.index] = null;
+            else player.board[target.r][target.c] = null;
+        }
+        const upgradedUnit = new Unit(typeKey, false, starLevel + 1);
+        const emptySlot = player.bench.findIndex(slot => slot === null);
+        if (emptySlot !== -1) player.bench[emptySlot] = upgradedUnit;
+        else player.board[units[2].r][units[2].c] = upgradedUnit;
+
+        if (starLevel + 1 < 3) checkTripleMerge(player, typeKey, starLevel + 1);
+    }
+}
+
+function getOnBoardUnitCount(player = players[0]) {
+    let count = 0;
+    for (let r = 4; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            if (player.board[r][c]) count++;
+        }
+    }
+    return count;
+}
+
+function getCanvasCoords(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+
+function findCellAt(x, y) {
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            const center = getCellCenter(r, c);
+            if (Math.hypot(x - center.x, y - center.y) <= hexRadius * 1.15) {
+                return { type: 'board', r, c };
+            }
+        }
+    }
+
+    const benchY = canvas.height * 0.77;
+    const hexW = Math.sqrt(3) * hexRadius;
+    const startX = (canvas.width - (6 * hexW)) / 2 + hexW / 2;
+
+    for (let c = 0; c < 6; c++) {
+        const bx = startX + c * hexW;
+        if (Math.hypot(x - bx, y - benchY) <= hexRadius * 1.15) {
+            return { type: 'bench', index: c };
+        }
+    }
+    return null;
+}
+
+// INSPECT MODAL (HIỆN BẢNG CHỈ SỐ KHI CHẠM VÀO TƯỚNG)
+function inspectUnit(unit) {
+    if (!unit || unit.isMonster) return;
+    state.inspectedUnitRef = unit;
+
+    document.getElementById("inspect-name").innerText = `${unit.name} (Cấp ${unit.star}⭐)`;
+    document.getElementById("inspect-trait").innerText = unit.trait;
+    document.getElementById("inspect-hp").innerText = unit.maxHp;
+    document.getElementById("inspect-atk").innerText = unit.atk;
+    document.getElementById("inspect-range").innerText = unit.range;
+    document.getElementById("inspect-star").innerText = unit.star;
+
+    const sellGold = unit.cost * unit.star;
+    document.getElementById("inspect-sell-gold").innerText = sellGold;
+
+    // Chỉ cho phép bán nếu đang xem sân nhà (Player 0)
+    document.getElementById("btn-inspect-sell").style.display = (currentViewingPlayerId === 0) ? "block" : "none";
+    document.getElementById("unit-inspect-modal").style.display = "flex";
+}
+
+function closeInspectModal() {
+    document.getElementById("unit-inspect-modal").style.display = "none";
+    state.inspectedUnitRef = null;
+}
+
+function sellInspectedUnit() {
+    if (!state.inspectedUnitRef || currentViewingPlayerId !== 0) return;
+    const unit = state.inspectedUnitRef;
+    let myPlayer = players[0];
+
+    // Tìm và xóa tướng khỏi bàn hoặc hàng chờ
+    let found = false;
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            if (myPlayer.board[r][c] === unit) {
+                myPlayer.board[r][c] = null;
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    if (!found) {
+        let bIdx = myPlayer.bench.indexOf(unit);
+        if (bIdx !== -1) {
+            myPlayer.bench[bIdx] = null;
+        }
+    }
+
+    state.gold += unit.cost * unit.star;
+    playSound('sell');
+    closeInspectModal();
+    updateUI();
+}
+
+// DRAG AND DROP & KÉO THẢ BÁN TƯỚNG
+let isPointerDown = false;
+let pointerDownPos = { x: 0, y: 0 };
+let hasMoved = false;
+
+canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    initAudio();
+    isPointerDown = true;
+    hasMoved = false;
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    pointerDownPos = coords;
+
+    const cell = findCellAt(coords.x, coords.y);
+    let activePlayer = players[currentViewingPlayerId];
+
+    if (cell) {
+        if (cell.type === 'board' && cell.r < 4) return;
+
+        let unit = (cell.type === 'board') ? activePlayer.board[cell.r][cell.c] : activePlayer.bench[cell.index];
+        if (unit) {
+            state.draggedUnit = unit;
+            state.dragStartLocation = cell;
+            state.dragPos = coords;
+
+            document.getElementById("sell-price-val").innerText = unit.cost * unit.star;
+        }
+    }
+});
+
+canvas.addEventListener("pointermove", (e) => {
+    if (!isPointerDown) return;
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    
+    if (Math.hypot(coords.x - pointerDownPos.x, coords.y - pointerDownPos.y) > 8) {
+        hasMoved = true;
+    }
+
+    if (state.draggedUnit && hasMoved) {
+        state.dragPos = coords;
+
+        const controlsRect = document.getElementById("controls").getBoundingClientRect();
+        const overlayEl = document.getElementById("sell-overlay");
+        const controlsEl = document.getElementById("controls");
+
+        if (e.clientY >= controlsRect.top) {
+            overlayEl.style.display = "flex";
+            controlsEl.classList.add("sell-hover");
+        } else {
+            overlayEl.style.display = "none";
+            controlsEl.classList.remove("sell-hover");
+        }
+    }
+});
+
+canvas.addEventListener("pointerup", (e) => {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+
+    const overlayEl = document.getElementById("sell-overlay");
+    const controlsEl = document.getElementById("controls");
+    overlayEl.style.display = "none";
+    controlsEl.classList.remove("sell-hover");
+
+    let activePlayer = players[currentViewingPlayerId];
+
+    if (state.draggedUnit) {
+        const controlsRect = controlsEl.getBoundingClientRect();
+
+        if (!hasMoved) {
+            // Nếu click chạm bình thường (không kéo thả) -> Hiện bảng chỉ số tướng
+            inspectUnit(state.draggedUnit);
+        } else if (e.clientY >= controlsRect.top) {
+            // Nếu kéo thả vào vùng shop dưới cùng -> Bán tướng (chỉ áp dụng sân nhà)
+            if (currentViewingPlayerId === 0) {
+                sellUnit(state.draggedUnit, state.dragStartLocation);
+            }
+        } else {
+            // Kéo thả di chuyển vị trí tướng trên bàn/bench (chỉ áp dụng sân nhà)
+            if (currentViewingPlayerId === 0) {
+                const coords = getCanvasCoords(e.clientX, e.clientY);
+                const targetCell = findCellAt(coords.x, coords.y);
+                if (targetCell) {
+                    executeMoveUnit(activePlayer, state.dragStartLocation, targetCell, state.draggedUnit);
+                }
+            }
+        }
+
+        state.draggedUnit = null;
+        state.dragStartLocation = null;
+    }
+});
+
+function sellUnit(unit, src) {
+    if (state.phase !== "PREPARE" || currentViewingPlayerId !== 0) return;
+
+    let myPlayer = players[0];
+    state.gold += unit.cost * unit.star;
+    playSound('sell');
+
+    if (src.type === 'board') {
+        myPlayer.board[src.r][src.c] = null;
+    } else if (src.type === 'bench') {
+        myPlayer.bench[src.index] = null;
+    }
+
+    closeInspectModal();
+    updateUI();
+}
+
+function executeMoveUnit(player, src, dest, unit) {
+    if (dest.type === 'board' && dest.r < 4) return;
+
+    if (dest.type === 'board' && dest.r >= 4) {
+        const target = player.board[dest.r][dest.c];
+        if (!target && src.type === 'bench' && getOnBoardUnitCount(player) >= state.level) {
+            alert(`Cấp ${state.level} chỉ cho phép ${state.level} tướng ra trận!`);
+            return;
+        }
+        player.board[dest.r][dest.c] = unit;
+        if (src.type === 'board') player.board[src.r][src.c] = target;
+        else player.bench[src.index] = target;
+    } else if (dest.type === 'bench') {
+        const target = player.bench[dest.index];
+        player.bench[dest.index] = unit;
+        if (src.type === 'board') player.board[src.r][src.c] = target;
+        else player.bench[dest.index] = target;
+    }
+
+    if (src.type === 'board' && (src.r !== dest.r || src.c !== dest.c)) {
+        if (player.board[src.r][src.c] === unit) player.board[src.r][src.c] = null;
+    } else if (src.type === 'bench' && (src.index !== dest.index || dest.type !== 'bench')) {
+        if (player.bench[src.index] === unit) player.bench[src.index] = null;
+    }
+
+    updateUI();
+}
+
+function viewPlayerBoard(playerId) {
+    currentViewingPlayerId = playerId;
+    document.getElementById("btn-return-home").style.display = (currentViewingPlayerId !== 0) ? "block" : "none";
+    closeInspectModal();
+    updateUI();
+}
+
+function pickNextOpponent() {
+    const isPVE = (state.stageMajor === 1 && state.stageMinor <= 3) || (state.stageMinor === 6);
+    if (isPVE) {
+        currentOpponentId = null;
+    } else {
+        const aliveBots = players.filter(p => p.isBot && p.hp > 0);
+        if (aliveBots.length > 0) {
+            const randomBot = aliveBots[Math.floor(Math.random() * aliveBots.length)];
+            currentOpponentId = randomBot.id;
+        } else {
+            currentOpponentId = null;
+        }
+    }
+}
+
+function spawnPveMonstersIfPrepare() {
+    let myPlayer = players[0];
+    
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            myPlayer.board[r][c] = null;
+        }
+    }
+
+    const isPVE = (state.stageMajor === 1 && state.stageMinor <= 3) || (state.stageMinor === 6);
+
+    if (isPVE) {
+        if (state.stageMajor === 1 && state.stageMinor <= 3) {
+            const monsterCount = state.stageMinor; 
+            const spawnPositions = [[1, 2], [1, 1], [1, 3]];
+            for (let i = 0; i < monsterCount; i++) {
+                const [r, c] = spawnPositions[i];
+                const monster = new Unit("SmallMonster", true, 1, true);
+                let pos = getCellCenter(r, c);
+                monster.x = pos.x;
+                monster.y = pos.y;
+                myPlayer.board[r][c] = monster;
+            }
+        } else if (state.stageMinor === 6) {
+            const boss = new Unit("BossMonster", true, 1, true);
+            boss.maxHp = 1200 + (state.stageMajor - 2) * 800;
+            boss.hp = boss.maxHp;
+            boss.atk = 65 + (state.stageMajor - 2) * 20;
+
+            let pos = getCellCenter(1, 2);
+            boss.x = pos.x;
+            boss.y = pos.y;
+            myPlayer.board[1][2] = boss;
+        }
+    }
+}
+
+function spawnPvpEnemiesForCombat() {
+    let myPlayer = players[0];
+    const isPVE = (state.stageMajor === 1 && state.stageMinor <= 3) || (state.stageMinor === 6);
+
+    if (!isPVE && currentOpponentId !== null) {
+        const bot = players.find(p => p.id === currentOpponentId);
+        if (bot) {
+            for (let r = 4; r < TOTAL_ROWS; r++) {
+                for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+                    if (bot.board[r][c]) {
+                        let enemyR = 3 - (r - 4);
+                        let enemyUnit = new Unit(bot.board[r][c].typeKey, true, bot.board[r][c].star);
+                        let pos = getCellCenter(enemyR, c);
+                        enemyUnit.x = pos.x;
+                        enemyUnit.y = pos.y;
+                        myPlayer.board[enemyR][c] = enemyUnit;
+                    }
+                }
+            }
+        }
+    }
+}
+
+function processBotAI() {
+    players.forEach(p => {
+        if (!p.isBot || p.hp <= 0) return;
+
+        p.gold += 5 + Math.min(5, Math.floor(p.gold / 10));
+        p.xp += 2;
+        while (p.level < 8 && p.xp >= LEVEL_XP[p.level]) {
+            p.xp -= LEVEL_XP[p.level];
+            p.level++;
+        }
+
+        if (p.gold >= 10 && p.level < 8) {
+            p.gold -= 4;
+            p.xp += 4;
+        }
+
+        const keys = Object.keys(HERO_TYPES);
+        while (p.gold >= 2) {
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            const cost = HERO_TYPES[randomKey].cost;
+            if (p.gold >= cost) {
+                const emptyBench = p.bench.findIndex(slot => slot === null);
+                if (emptyBench !== -1) {
+                    p.gold -= cost;
+                    p.bench[emptyBench] = new Unit(randomKey);
+                    checkTripleMerge(p, randomKey, 1);
+                } else break;
+            } else break;
+        }
+
+        let currentOnBoard = getOnBoardUnitCount(p);
+        while (currentOnBoard < p.level) {
+            const benchUnitIdx = p.bench.findIndex(slot => slot !== null);
+            if (benchUnitIdx === -1) break;
+
+            let placed = false;
+            for (let r = 7; r >= 4; r--) {
+                for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+                    if (!p.board[r][c]) {
+                        p.board[r][c] = p.bench[benchUnitIdx];
+                        p.bench[benchUnitIdx] = null;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (placed) break;
+            }
+            if (!placed) break;
+            currentOnBoard = getOnBoardUnitCount(p);
+        }
+    });
+}
+
+function startCombat() {
+    if (state.phase === "COMBAT") return;
+    viewPlayerBoard(0);
+    closeInspectModal();
+
+    spawnPvpEnemiesForCombat();
+
+    let myPlayer = players[0];
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            if (myPlayer.board[r][c]) {
+                let u = myPlayer.board[r][c];
+                let pos = getCellCenter(r, c);
+                u.x = pos.x;
+                u.y = pos.y;
+            }
+        }
+    }
+
+    state.phase = "COMBAT";
+    updateUI();
+}
+
+function stepCombat() {
+    let myPlayer = players[0];
+    let playerUnits = [];
+    let enemyUnits = [];
+
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            let u = myPlayer.board[r][c];
+            if (u && u.hp > 0) {
+                if (u.isEnemy) enemyUnits.push(u);
+                else playerUnits.push(u);
+            }
+        }
+    }
+
+    if (playerUnits.length === 0 || enemyUnits.length === 0) {
+        endCombat(playerUnits.length > 0 && enemyUnits.length === 0, playerUnits.length, enemyUnits.length);
+        return;
+    }
+
+    for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        let p = state.projectiles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+
+        if (p.life <= 0) {
+            p.target.hp -= p.damage;
+            p.owner.mana = Math.min(p.owner.maxMana, p.owner.mana + 25);
+            state.projectiles.splice(i, 1);
+        }
+    }
+
+    const allUnits = [...playerUnits, ...enemyUnits];
+    allUnits.forEach(u => {
+        if (u.hp <= 0) return;
+        const targets = u.isEnemy ? playerUnits : enemyUnits;
+        if (targets.length === 0) return;
+
+        let nearest = null;
+        let minDist = 9999;
+
+        targets.forEach(t => {
+            let dist = Math.hypot(t.x - u.x, t.y - u.y);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = t;
+            }
+        });
+
+        if (nearest) {
+            const attackDist = u.range * hexRadius * 2.2;
+            if (minDist <= attackDist) {
+                u.attackTimer++;
+                if (u.attackTimer >= 35) {
+                    u.attackTimer = 0;
+                    let isSkill = false;
+                    let dmg = u.atk;
+                    if (u.mana >= u.maxMana) {
+                        u.mana = 0;
+                        dmg = Math.floor(u.atk * 1.8);
+                        isSkill = true;
+                        playSound('skill');
+                    } else {
+                        playSound('attack');
+                    }
+
+                    state.projectiles.push({
+                        x: u.x, y: u.y,
+                        vx: (nearest.x - u.x) / 8,
+                        vy: (nearest.y - u.y) / 8,
+                        life: 8,
+                        damage: dmg,
+                        target: nearest,
+                        owner: u,
+                        isSkill: isSkill,
+                        color: isSkill ? "#f1c40f" : u.color
+                    });
+                }
+            } else {
+                if (!u.isBoss) {
+                    const angle = Math.atan2(nearest.y - u.y, nearest.x - u.x);
+                    u.x += Math.cos(angle) * 1.2;
+                    u.y += Math.sin(angle) * 1.2;
+                }
+            }
+        }
+    });
+}
+
+function endCombat(playerWon, alivePlayerCount, aliveEnemyCount) {
+    state.phase = "PREPARE";
+    state.timer = 20;
+
+    let myPlayer = players[0];
+
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            myPlayer.board[r][c] = null;
+        }
+    }
+
+    for (let r = 4; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            if (myPlayer.board[r][c]) {
+                myPlayer.board[r][c].hp = myPlayer.board[r][c].maxHp;
+                myPlayer.board[r][c].mana = 0;
+            }
+        }
+    }
+
+    const damage = 2 + state.stageMajor * 2;
+    if (!playerWon) {
+        state.lossStreak++;
+        state.winStreak = 0;
+        myPlayer.hp = Math.max(0, myPlayer.hp - (damage + aliveEnemyCount));
+    } else {
+        state.winStreak++;
+        state.lossStreak = 0;
+        if (currentOpponentId !== null) {
+            let opponent = players.find(p => p.id === currentOpponentId);
+            if (opponent) {
+                opponent.hp = Math.max(0, opponent.hp - (damage + alivePlayerCount));
+            }
+        }
+    }
+
+    if (state.stageMajor === 1 && state.stageMinor <= 3) {
+        state.gold += 2;
+    } else {
+        let baseGold = 5;
+        let interestGold = Math.min(5, Math.floor(state.gold / 10));
+        let streakGold = 0;
+
+        let streak = playerWon ? state.winStreak : state.lossStreak;
+        if (streak >= 5) streakGold = 3;
+        else if (streak >= 3) streakGold = 2;
+        else if (streak >= 2) streakGold = 1;
+
+        state.gold += baseGold + interestGold + streakGold;
+    }
+
+    if (state.stageMajor === 1) {
+        state.stageMinor++;
+        if (state.stageMinor > 3) {
+            state.stageMajor = 2;
+            state.stageMinor = 1;
+        }
+    } else {
+        state.stageMinor++;
+        if (state.stageMinor > 6) {
+            state.stageMinor = 1;
+            state.stageMajor++;
+        }
+    }
+
+    if (state.stageMajor === 1) {
+        if (state.stageMinor === 2 || state.stageMinor === 3) addXP(2);
+    } else {
+        addXP(2);
+    }
+
+    processBotAI();
+    pickNextOpponent();
+    spawnPveMonstersIfPrepare();
+    refreshShop();
+    updateUI();
+}
+
+function getActiveSynergies() {
+    const counts = {};
+    const countedTypeKeys = new Set();
+    let myPlayer = players[0];
+
+    for (let r = 4; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            const u = myPlayer.board[r][c];
+            if (u && !u.isEnemy && !countedTypeKeys.has(u.typeKey)) {
+                countedTypeKeys.add(u.typeKey);
+                counts[u.trait] = (counts[u.trait] || 0) + 1;
+            }
+        }
+    }
+    return counts;
+}
+
+function renderSynergiesUI() {
+    const synListEl = document.getElementById("synergy-list");
+    synListEl.innerHTML = "";
+
+    const activeCounts = getActiveSynergies();
+
+    for (let traitKey in SYNERGIES_DATA) {
+        const syn = SYNERGIES_DATA[traitKey];
+        const count = activeCounts[traitKey] || 0;
+
+        let activeClass = "";
+        if (count >= syn.thresholds[1]) activeClass = "active-2";
+        else if (count >= syn.thresholds[0]) activeClass = "active-1";
+
+        const item = document.createElement("div");
+        item.className = `synergy-item ${activeClass}`;
+        item.innerHTML = `
+            <div class="synergy-header">
+                <span>${syn.name}</span>
+                <span class="synergy-count">${count}</span>
+            </div>
+            <div class="synergy-thresholds">Mốc: ${syn.thresholds.join(" / ")}</div>
+        `;
+        synListEl.appendChild(item);
+    }
+}
+
+function updateUI() {
+    const myPlayer = players[0];
+    document.getElementById("hp-val").innerText = myPlayer.hp;
+    document.getElementById("gold-val").innerText = state.gold;
+    document.getElementById("level-val").innerText = state.level;
+    document.getElementById("xp-val").innerText = `${state.xp}/${LEVEL_XP[state.level] || 'MAX'}`;
+    document.getElementById("stage-val").innerText = `Stage ${state.stageMajor}-${state.stageMinor}`;
+
+    const bannerEl = document.getElementById("match-banner");
+    const isPVE = (state.stageMajor === 1 && state.stageMinor <= 3) || (state.stageMinor === 6);
+
+    if (isPVE) {
+        const monsterName = (state.stageMinor === 6) ? "Đại Quái Boss" : "Tiểu Yêu";
+        bannerEl.innerHTML = `👹 Vòng Quái: ${monsterName}`;
+        bannerEl.style.borderColor = "#9b59b6";
+        bannerEl.style.color = "#9b59b6";
+    } else if (currentOpponentId !== null) {
+        const opponent = players.find(p => p.id === currentOpponentId);
+        const name = opponent ? opponent.name : "Đối thủ";
+        bannerEl.innerHTML = `⚔️ ${state.phase === "PREPARE" ? "Đối thủ sắp tới" : "Đang đấu với"}: ${name}`;
+        bannerEl.style.borderColor = "#e74c3c";
+        bannerEl.style.color = "#e74c3c";
+    } else {
+        bannerEl.innerHTML = `🏆 Chuẩn bị giao chiến`;
+        bannerEl.style.borderColor = "#f1c40f";
+        bannerEl.style.color = "#f1c40f";
+    }
+
+    renderSynergiesUI();
+
+    const playersListEl = document.getElementById("players-list-content");
+    playersListEl.innerHTML = "";
+    players.forEach(p => {
+        const item = document.createElement("div");
+        const isTarget = (p.id === currentOpponentId);
+        item.className = `player-item ${p.id === currentViewingPlayerId ? 'viewing' : ''} ${isTarget ? 'target-opponent' : ''} ${p.hp <= 0 ? 'dead' : ''}`;
+        
+        item.innerHTML = `
+            <div style="display:flex; align-items:center;">
+                ${isTarget ? '<span class="sword-icon">⚔️</span>' : ''}
+                <span class="player-name">${p.name}</span>
+            </div>
+            <span class="player-hp">❤️${p.hp}</span>
+        `;
+        item.addEventListener("pointerdown", () => viewPlayerBoard(p.id));
+        playersListEl.appendChild(item);
+    });
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+
+    let activePlayer = players[currentViewingPlayerId];
+
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            const pos = getCellCenter(r, c);
+            drawHexagon(pos.x, pos.y, hexRadius - 2, "rgba(231, 76, 60, 0.12)", "rgba(231, 76, 60, 0.5)");
+        }
+    }
+
+    for (let r = 4; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            const pos = getCellCenter(r, c);
+            drawHexagon(pos.x, pos.y, hexRadius - 2, "rgba(46, 204, 113, 0.12)", "rgba(46, 204, 113, 0.5)");
+        }
+    }
+
+    const benchY = canvas.height * 0.77;
+    const hexW = Math.sqrt(3) * hexRadius;
+    const startX = (canvas.width - (6 * hexW)) / 2 + hexW / 2;
+
+    for (let c = 0; c < 6; c++) {
+        const bx = startX + c * hexW;
+        drawHexagon(bx, benchY, hexRadius - 2, "rgba(241, 196, 15, 0.1)", "rgba(241, 196, 15, 0.5)");
+    }
+
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < BOARD_LAYOUT[r]; c++) {
+            const u = activePlayer.board[r][c];
+            if (u && u.hp > 0 && u !== state.draggedUnit) {
+                const isPVE = (state.stageMajor === 1 && state.stageMinor <= 3) || (state.stageMinor === 6);
+                if (r < 4 && state.phase === "PREPARE" && !isPVE) {
+                    continue; 
+                }
+
+                const pos = (state.phase === "COMBAT" && currentViewingPlayerId === 0) ? { x: u.x, y: u.y } : getCellCenter(r, c);
+                drawUnit(u, pos.x, pos.y);
+            }
+        }
+    }
+
+    for (let c = 0; c < 6; c++) {
+        const u = activePlayer.bench[c];
+        if (u && u !== state.draggedUnit) {
+            const bx = startX + c * hexW;
+            drawUnit(u, bx, benchY);
+        }
+    }
+
+    if (state.draggedUnit && hasMoved) {
+        drawUnit(state.draggedUnit, state.dragPos.x, state.dragPos.y, 1.25);
+    }
+
+    state.projectiles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.isSkill ? 7 : 4, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.restore();
+
+    if (state.phase === "COMBAT") stepCombat();
+    requestAnimationFrame(render);
+}
+
+function drawUnit(unit, cx, cy, scale = 1) {
+    const sizeMultiplier = (unit.size || 1) * scale;
+    const radius = hexRadius * 0.65 * (sizeMultiplier > 1 ? 2.2 : 1);
+
+    ctx.fillStyle = unit.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = unit.isEnemy ? "#e74c3c" : "#2ecc71";
+    ctx.lineWidth = sizeMultiplier > 1 ? 4 : 2.5;
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${sizeMultiplier > 1 ? 14 : 10}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(unit.name, cx, cy + (sizeMultiplier > 1 ? 4 : 3));
+
+    const barW = hexRadius * 1.1 * (sizeMultiplier > 1 ? 2 : 1);
+    const barH = sizeMultiplier > 1 ? 5 : 3;
+    const barX = cx - barW / 2;
+    const hpBarY = cy + radius + 3;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(barX, hpBarY, barW, barH);
+    ctx.fillStyle = unit.isEnemy ? "#e74c3c" : "#2ecc71";
+    ctx.fillRect(barX, hpBarY, barW * Math.max(0, unit.hp / unit.maxHp), barH);
+}
+
+initGame();
+refreshShop();
+updateUI();
+render();
+</script>
+</body>
+</html>
